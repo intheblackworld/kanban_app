@@ -1,0 +1,162 @@
+### 執行基本筆記程式流程
+1. 使用者 點擊新增按鈕
+2. Note.jsx渲染自己 顯示出預設的值
+3. 使用者確認修改
+4. Note.jsx宣染自己 顯示出修改後的值
+
+### 兩個問題需要注意
+* Note 需要追蹤自己的狀態。
+* 在狀態改變的時候我們需要跟App 溝通，讓他知道要更新狀態。
+
+
+#### 追蹤狀態
+修改 Note.jsx
+1. 初始化他
+2. 加this.state追蹤狀態 this.state= { editing: false};
+3. 加入 if else 判斷狀態是否為修改
+4. 加入各種input 偵測
+5. 各種修改....
+
+
+```
+export default class Note extends React.Component{
+  constructor(props) {
+    super(props);
+
+    //Track editing State
+    this.state = {
+      editing: false
+    };
+  }
+  render () {
+    if(this.state.editing) {
+      return this.renderEdit();
+    }
+
+    return this.renderNote();
+  }
+
+renderEdit = () => {
+  // We deal with blur and input handlers here. These map to DOM events.
+  // We also set selection to input end using a callback at a ref.
+  // It gets triggered after the component is mounted.
+  // We could also use a string reference (i.e., `ref="input") and // then refer to the element in question later in the code. This
+  // would allow us to use the underlying DOM API through
+  // this.refs.input. This can be useful when combined with
+  // React lifecycle hooks.
+  return <input type="text" ref={
+    (e) => e ? e.selectionStart = this.props.task.length : null
+    //三元判斷式，判斷e是否為空
+  }
+  autoFocus = {true}
+  defaultValue = {this.props.task}
+  onblur = {this.finishEdit}
+  onKeyPress = {this.checkEnter} />;//加入input 的各種偵測狀態
+
+};
+
+renderNote = () => {
+  // if user click a normal note , 觸發editing logic.
+  return <div onClick={this.edit}>{this.props.task}</div>;
+}
+edit = () => {
+  this.setState({
+    editing: true
+  });
+
+};
+checkEnter = (e) => {
+  //the user hit enter, let`s finish up.
+  if( e.key === "Enter") {
+    this.finishEdit(e);
+  }
+};
+finishEdit = (e) => {
+  // `Note` will trigger an optional `onEdit` callback once it
+  // has a new value. We will use this to communicate the change to
+  // `App`.
+  //
+  // A smarter way to deal with the default value would be to set
+  // it through `defaultProps`.
+  //
+  // See the *Typing with React* chapter for more information.
+  const value = e.target.value;
+
+  if(this.props.onEdit) {
+    this.props.onEdit(value);
+
+    //Exit edit mode.
+    this.setState({
+      editing: false;
+    });
+  }
+};
+}
+```
+
+### 當 Note state 狀態改變的溝通
+push the logic to Notes.jsx,這可能會讓addNote這個function有問題
+因為addNote 不屬於 Notes這隻檔案，所以要keep the application state
+at App level,為了讓onEdit work, 我們需要捕捉他的output and 指派他的結果
+去 App.jsx,這個流程可以藉由data binding 實現，下面是流程圖
+
+![](./img/4.5_1_onEdit_flow.png)
+
+
+因為 onEdit 被定義在App level , 我們需要從 Notes傳遞onEdit 過去。
+我們需要修改兩隻檔案
+
+```
+app/components/App.jsx
+
+import uuid from 'node-uuid';
+import React from 'react';
+import Notes from './Notes.jsx';
+export default class App extends React.Component {
+  constructor(props) {
+... }
+  render() {
+    const notes = this.state.notes;
+    return (
+      <div>
+        <button onClick={this.addNote}>+</button>
+        <Notes notes={notes} />
+        <Notes notes={notes} onEdit={this.editNote} />
+</div> );
+  }
+  addNote = () => {
+... };
+  editNote = (id, task) => {
+    // Don't modify if trying set an empty value
+    if(!task.trim()) {
+return; }
+    const notes = this.state.notes.map(note => {
+      if(note.id === id && task) {
+        note.task = task;
+      }
+      return note;
+    });
+    this.setState({notes});
+  };
+}
+
+```
+
+
+為了讓結構組織順利運作，我們要根據先前規劃修改 Notes ，
+他會綁定(bind)note的id ,當callback被觸發，留存的參數會接受
+值。
+
+```
+app/components/Notes.jsx
+import React from 'react'; import Note from './Note.jsx';
+export default ({notes, onEdit}) => { return (
+    <ul>{notes.map(note =>
+      <li key={note.id}>
+<Note
+task={note.task} onEdit={onEdit.bind(null, note.id)} />
+      </li>
+    )}</ul>
+); }
+
+```
